@@ -34,6 +34,7 @@ tf.compat.v1.flags.DEFINE_integer('tflite_height', 1080, 'Height of LR image in 
 tf.compat.v1.flags.DEFINE_integer('tflite_width', 1920, 'Width of LR image in TFLITE')
 
 import utils
+import datetime
 
 #Set some dataset processing parameters and some save/load paths
 DATASET_NAME = 'div2k' if FLAGS.scale == 2 else 'div2k/bicubic_x4'
@@ -42,6 +43,9 @@ if not os.path.exists('logs/'):
 BASE_SAVE_DIR = 'logs/x2_models/' if FLAGS.scale == 2 else 'logs/x4_models/'
 if not os.path.exists(BASE_SAVE_DIR):
   os.makedirs(BASE_SAVE_DIR)
+Tensorboard_DIR = 'logs/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+if not os.path.exists(Tensorboard_DIR):
+  os.makedirs(Tensorboard_DIR)
 
 SUFFIX = 'QAT' if (FLAGS.quant_W and FLAGS.quant_A) else 'FP32'
 
@@ -71,54 +75,61 @@ def main(unused_argv):
     dataset_validation = dataset_validation.prefetch(tf.data.experimental.AUTOTUNE)
     dataset_train = dataset_train.map(utils.rgb_to_y).cache()
     dataset_validation = dataset_validation.map(utils.rgb_to_y).cache()
-    dataset_train = dataset_train.map(utils.patches).unbatch().shuffle(buffer_size=1_000)
+    dataset_train = dataset_train.map(utils.patches).unbatch().shuffle(buffer_size=1000)
 
     #PSNR metric to be monitored while training.
     def psnr(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         return tf.image.psnr(y_true, y_pred, max_val=1.)
 
-    mirrored_strategy = tf.distribute.MirroredStrategy()
+    def ssim(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        return tf.image.ssim(y_true, y_pred, max_val=1.)
+
+    # mirrored_strategy = tf.distribute.MirroredStrategy()
     # atexit.register(mirrored_strategy._extended._collective_ops._pool.close) # type: ignore (needed for tf2.7?)
 
     #Select the model to train.
-    with mirrored_strategy.scope():
-        if FLAGS.model_name == 'SESR':
-          if FLAGS.linear_block_type=='collapsed':
-            LinearBlock_fn = model_utils.LinearBlock_c
-          else:
-            LinearBlock_fn = model_utils.LinearBlock_e
-          model = sesr.SESR(
-            m=FLAGS.m,
-            feature_size=FLAGS.feature_size,
-            LinearBlock_fn=LinearBlock_fn,
-            quant_W=FLAGS.quant_W > 0,
-            quant_A=FLAGS.quant_A > 0,
-            gen_tflite = FLAGS.gen_tflite,
-            mode='train')
-    
-        #Declare the optimizer.
-        optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate, 
-                                          amsgrad=True)
-    
-        #If scale == 4, base x2 model must be loaded for transfer learning.
-        #Load the pretrained weights into the base model from x2 SISR:
-        if FLAGS.scale == 4:
-          base_model = tf.keras.models.load_model(PATH_2X, custom_objects={'psnr': psnr})
-          layer_dict = dict([(layer.name, layer) for layer in base_model.layers])
-          for layer in model.layers:
-            layer_name = layer.name
-            if FLAGS.model_name == 'SESR':
-              if layer_name != 'linear_block_{}'.format(FLAGS.m+1): #Last layer in x4 is not the same as that in x2 for SESR
-                print(layer_name)
-                layer.set_weights = layer_dict[layer_name].get_weights()
+    # with mirrored_strategy.scope():
+    if FLAGS.model_name == 'SESR':
+      if FLAGS.linear_block_type=='collapsed':
+        LinearBlock_fn = model_utils.LinearBlock_c
+      else:
+        LinearBlock_fn = model_utils.LinearBlock_e
+      model = sesr.SESR(
+        m=FLAGS.m,
+        feature_size=FLAGS.feature_size,
+        LinearBlock_fn=LinearBlock_fn,
+        quant_W=FLAGS.quant_W > 0,
+        quant_A=FLAGS.quant_A > 0,
+        gen_tflite = FLAGS.gen_tflite,
+        mode='train')
 
-        #Compile and train the model.
-        model.compile(optimizer=optimizer, loss='mae', metrics=[psnr])
+    #Declare the optimizer.
+    optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate, 
+                                      amsgrad=True)
+
+    #If scale == 4, base x2 model must be loaded for transfer learning.
+    #Load the pretrained weights into the base model from x2 SISR:
+    if FLAGS.scale == 4:
+      base_model = tf.keras.models.load_model(PATH_2X, custom_objects={'psnr': psnr, 'ssim':ssim})
+      layer_dict = dict([(layer.name, layer) for layer in base_model.layers])
+      for layer in model.layers:
+        layer_name = layer.name
+        if FLAGS.model_name == 'SESR':
+          if layer_name != 'linear_block_{}'.format(FLAGS.m+1): #Last layer in x4 is not the same as that in x2 for SESR
+            print(layer_name)
+            layer.set_weights = layer_dict[layer_name].get_weights()
+
+    #Compile and train the model.
+    model.compile(optimizer=optimizer, loss='mae', metrics=[psnr, ssim])
     
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=Tensorboard_DIR, histogram_freq=1)
+
+
     model.fit(dataset_train.batch(FLAGS.batch_size), 
               epochs=FLAGS.epochs, 
               validation_data=dataset_validation.batch(1), 
-              validation_freq=1)
+              validation_freq=1,
+              callbacks=[tensorboard_callback])
     model.summary()
 
     #Save the trained models.
