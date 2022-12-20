@@ -1,11 +1,16 @@
-## SUPER-EFFICIENT SUPER RESOLUTION with ADDER LAYER (AdderSESR)
+# AdderSESR: Towards Energy and Computation Efficient Image Super-Resolution
 
-With similar or better image quality, AdderSESR achieves up 25x improvement (x2 super resolution) in Multiply-Accumulate (MAC) operations and 60x improvement in energy consumption compared to existing methods. 
 
-![AdderSESR Achieves State-of-the-art Super Resolution Results with 25x less MACs](/figures/MACs.png | width=200)
-![AdderSESR Achieves State-of-the-art Super Resolution Results with 60x fewer energy](/figures/Energy.png | width=200)
+AdderSESR networks establish a new state-of-the-art for efficient computation and low-energy image Super-Resolution. With similar or better image quality, AdderSESR achieves up **25x** improvement (x2 super resolution) in Multiply-Accumulate (MAC) operations and **60x** improvement in energy consumption compared to existing methods. 
 
-AdderSESR networks establish a new state-of-the-art for efficient computation and low-energy image Super-Resolution.
+
+
+<p align="center">
+    <img src="/figures/MACs.png" width=48%>
+    <img src="/figures/Energy.png" width=48%>
+</p>
+
+
 
 ## Efficient Training Methodology (Collapsible Block)
 The training time would increase if we directly train collapsible linear blocks in the expanded space and collapse them later. To address this, we developed an efficient implementation of SESR: We collapse the "Linear Blocks" at each training step (using Algorithms 1 and 2 shown in the paper), and then use this collapsed weight to perform forward pass convolutions. Since model weights are very small tensors compared to feature maps, this collapsing takes a very small time. _The training (backward pass) still updates the weights in the expanded space but the forward pass happens in collapsed space even during training_ (see figure below). Therefore, training the collapsible linear blocks is very efficient.
@@ -64,6 +69,7 @@ Run the following command to quantize the network while training and for generat
 | File | Description |
 | ------ | ------ |
 | train.py | Contains main training and eval loop for DIV2K dataset |
+| test.py | Contains main test on DIV2K validation dataset |
 | utils.py | Dataset utils and preprocessing |
 | models/adder.py | Contains Adder Layer class |
 | models/sesr.py | Contains main SESR network class |
@@ -90,12 +96,12 @@ Run the following command to quantize the network while training and for generat
 
 
 ## Reference
-Collapsible Linear Blocks for Super-Efficient Super Resolution [https://arxiv.org/abs/2103.09404]
+* [Collapsible Linear Blocks for Super-Efficient Super Resolution](https://arxiv.org/abs/2103.09404)
 
-AdderNet: Do We Really Need Multiplications in Deep Learning? [https://arxiv.org/abs/1912.13200]
+* [AdderNet: Do We Really Need Multiplications in Deep Learning?](https://arxiv.org/abs/1912.13200)
 
-AdderSR: Towards Energy Efficient Image Super-Resolution [https://openaccess.thecvf.com/content/CVPR2021/papers/Song_AdderSR_Towards_Energy_Efficient_Image_Super-Resolution_CVPR_2021_paper.pdf]
+* [AdderSR: Towards Energy Efficient Image Super-Resolution](https://openaccess.thecvf.com/content/CVPR2021/papers/Song_AdderSR_Towards_Energy_Efficient_Image_Super-Resolution_CVPR_2021_paper.pdf)
 
-This repo is developed from https://github.com/ARM-software/sesr and https://github.com/huawei-noah/AdderNet. 
+* This repo is developed from https://github.com/ARM-software/sesr and https://github.com/huawei-noah/AdderNet. 
 
 

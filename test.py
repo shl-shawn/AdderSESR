@@ -37,7 +37,7 @@ SUFFIX = 'QAT' if (FLAGS.quant_W and FLAGS.quant_A) else 'FP32'
 
 
 ##################################
-##  EVALUATION  ##
+##         EVALUATION           ##
 ##################################
 
 
@@ -56,18 +56,13 @@ def main(unused_argv):
 
     dataset_validation = dataset_validation.map(utils.patches)
 
-    #PSNR metric to be monitored while training.
+
     def psnr(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         return tf.image.psnr(y_true, y_pred, max_val=1.)
 
     def ssim(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         return tf.image.ssim(y_true, y_pred, max_val=1.)
 
-    # mirrored_strategy = tf.distribute.MirroredStrategy()
-    # atexit.register(mirrored_strategy._extended._collective_ops._pool.close) # type: ignore (needed for tf2.7?)
-
-    #Select the model to train.
-    # with mirrored_strategy.scope():
     if FLAGS.model_name == 'SESR':
       if FLAGS.linear_block_type=='collapsed':
         LinearBlock_fn = model_utils.LinearBlock_c
@@ -80,26 +75,14 @@ def main(unused_argv):
       
       print("linear_block_type: ", FLAGS.linear_block_type)
 
-    #   model = sesr.SESR(
-    #     m=FLAGS.m,
-    #     feature_size=FLAGS.feature_size,
-    #     LinearBlock_fn=LinearBlock_fn,
-    #     quant_W=FLAGS.quant_W > 0,
-    #     quant_A=FLAGS.quant_A > 0,
-    #     gen_tflite = FLAGS.gen_tflite,
-    #     mode='infer')
-
 
     model = tf.keras.models.load_model('/home/shawn/sesr/logs/adder_x2_models/SESR_m5_f16_x2_fs256_collapsed_adderTraining_FP32', \
         custom_objects={'psnr': psnr, 'ssim':ssim})
-
-
 
     result = model.evaluate(dataset_validation.batch(1))
     print(dict(zip(model.metrics_names, result)))
 
 
-   
 
 if __name__ == '__main__':
     tf.compat.v1.app.run()
