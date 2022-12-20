@@ -2,8 +2,8 @@
 
 With similar or better image quality, AdderSESR achieves up 25x improvement (x2 super resolution) in Multiply-Accumulate (MAC) operations and 60x improvement in energy consumption compared to existing methods. 
 
-![AdderSESR Achieves State-of-the-art Super Resolution Results with 25x less MACs](/figures/MACs.png)
-![AdderSESR Achieves State-of-the-art Super Resolution Results with 60x fewer energy](/figures/Energy.png)
+![AdderSESR Achieves State-of-the-art Super Resolution Results with 25x less MACs](/figures/MACs.png | width=200)
+![AdderSESR Achieves State-of-the-art Super Resolution Results with 60x fewer energy](/figures/Energy.png | width=200)
 
 AdderSESR networks establish a new state-of-the-art for efficient computation and low-energy image Super-Resolution.
 
