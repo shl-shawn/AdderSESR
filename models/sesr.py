@@ -89,6 +89,7 @@ class SESR(tf.keras.Model):
         self.residual_2_A_quant = ActivationQuantizationBlock(enabled=quant_A, mode=mode)
 
     def call(self, inputs, training=None, mask=None):
+
         inputs = self.inputs_A_quant(inputs)
         features_0 = features = self.input_block_A_quant(self.input_block(inputs - 0.5))
 

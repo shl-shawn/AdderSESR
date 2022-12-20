@@ -20,10 +20,10 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import atexit
 
-from models import sesr, model_utils
+from models import sesr, model_utils, adder
 
 FLAGS = tf.compat.v1.flags.FLAGS
-tf.compat.v1.flags.DEFINE_integer('epochs', 300, 'Number of epochs to train')
+tf.compat.v1.flags.DEFINE_integer('epochs', 100, 'Number of epochs to train')
 tf.compat.v1.flags.DEFINE_integer('batch_size', 32, 'Batch size during training')
 tf.compat.v1.flags.DEFINE_float('learning_rate', 2e-4, 'Learning rate for ADAM')
 tf.compat.v1.flags.DEFINE_string('model_name', 'SESR', 'Name of the model')
@@ -40,12 +40,14 @@ import datetime
 DATASET_NAME = 'div2k' if FLAGS.scale == 2 else 'div2k/bicubic_x4'
 if not os.path.exists('logs/'):
   os.makedirs('logs/')
-BASE_SAVE_DIR = 'logs/x2_models/' if FLAGS.scale == 2 else 'logs/x4_models/'
+BASE_SAVE_DIR = 'logs/adder_x2_models/' if FLAGS.scale == 2 else 'logs/x4_models/'
 if not os.path.exists(BASE_SAVE_DIR):
   os.makedirs(BASE_SAVE_DIR)
-Tensorboard_DIR = 'logs/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+print("BASE_SAVE_DIR: ", BASE_SAVE_DIR)
+Tensorboard_DIR = 'logs/adder_tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 if not os.path.exists(Tensorboard_DIR):
   os.makedirs(Tensorboard_DIR)
+print("Tensorboard_DIR: ", Tensorboard_DIR)
 
 SUFFIX = 'QAT' if (FLAGS.quant_W and FLAGS.quant_A) else 'FP32'
 
@@ -92,8 +94,15 @@ def main(unused_argv):
     if FLAGS.model_name == 'SESR':
       if FLAGS.linear_block_type=='collapsed':
         LinearBlock_fn = model_utils.LinearBlock_c
-      else:
+      elif FLAGS.linear_block_type=='expanded':
         LinearBlock_fn = model_utils.LinearBlock_e
+      elif FLAGS.linear_block_type=='collapsed_adder':
+        LinearBlock_fn = model_utils.LinearBlock_c_adder
+      else:
+        raise "Please specify linear block type."
+      
+      print("linear_block_type: ", FLAGS.linear_block_type)
+
       model = sesr.SESR(
         m=FLAGS.m,
         feature_size=FLAGS.feature_size,
@@ -127,8 +136,8 @@ def main(unused_argv):
 
     model.fit(dataset_train.batch(FLAGS.batch_size), 
               epochs=FLAGS.epochs, 
-              validation_data=dataset_validation.batch(1), 
-              validation_freq=1,
+              # validation_data=dataset_validation.batch(1), 
+              # validation_freq=1,
               callbacks=[tensorboard_callback])
     model.summary()
 
